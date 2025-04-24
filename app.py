@@ -3,54 +3,99 @@ import pandas as pd
 import folium
 from streamlit_folium import folium_static
 import plotly.express as px
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+import time
 
-# --- App Title ---
+# --- Spotify Authentication ---
+client_id = '78bdb3a079034abdb0ea7ed6df0ff528'
+client_secret = 'dd79a32ec58d4e17a63241d8e597eba8'
+
+# Set up Spotify API client
+client_credentials_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+
+# --- Streamlit App Title ---
 st.title("🇬🇧 Sound of the UK")
 st.markdown("Explore how music tastes vary across UK cities using Spotify data: track trends, moods, and genre preferences.")
 
-# --- Load Data ---
+# --- Real-Time Data Fetching Function ---
 @st.cache_data
-def load_data():
-    df = pd.read_csv("data/uk_spotify_by_city.csv")  # Your dataset should have: city, lat, lon, track_name, artist, streams, danceability, energy, valence
-    return df
+def get_spotify_data():
+    # Example: Fetching the top 10 tracks in the UK based on popularity or streams
+    # Here, I'm getting tracks from a top chart playlist (e.g., 'Top 50 - United Kingdom')
+    playlist_id = '37i9dQZEVXbLp5XoPON0wI'  # Spotify Playlist ID for 'Top 50 - United Kingdom'
+    results = sp.playlist_tracks(playlist_id)
+    
+    # Extracting track names, artists, and streams (popularity)
+    track_data = []
+    for item in results['items']:
+        track_name = item['track']['name']
+        artist_name = item['track']['artists'][0]['name']
+        popularity = item['track']['popularity']
+        
+        track_data.append({
+            'Track': track_name,
+            'Artist': artist_name,
+            'Popularity': popularity
+        })
+    
+    return pd.DataFrame(track_data)
 
-data = load_data()
+# --- Load Real-Time Data ---
+data = get_spotify_data()
+
+# --- Display Real-Time Data ---
+st.subheader("🎶 Real-Time Top Tracks in the UK")
+st.dataframe(data)
 
 # --- Sidebar: City Filter ---
 st.sidebar.header("Filter Options")
-cities = sorted(data["city"].unique())
+cities = sorted(['London', 'Manchester', 'Liverpool', 'Birmingham'])  # List of cities for filter example
 selected_city = st.sidebar.selectbox("Select a City", cities)
 
-# --- Filtered Data ---
-city_data = data[data["city"] == selected_city]
+# --- Placeholder for Filtered Data (in real scenario, use Spotify data or CSV) ---
+# For now, assume real-time data is available for each city
+# Replace this part with actual city-based data later
+city_data = data
 
-# --- City Overview ---
+# --- City Overview (Using real-time data) ---
 st.subheader(f"🎶 Top Tracks in {selected_city}")
-top_tracks = city_data.groupby(["track_name", "artist"])["streams"].sum().reset_index().sort_values(by="streams", ascending=False).head(10)
+top_tracks = city_data.groupby(["Track", "Artist"])["Popularity"].sum().reset_index().sort_values(by="Popularity", ascending=False).head(10)
 st.dataframe(top_tracks)
 
-# --- Mood Metrics ---
-st.subheader("🎧 Mood Metrics")
-avg_metrics = city_data[["danceability", "energy", "valence"]].mean().round(2)
-st.metric("Danceability", avg_metrics["danceability"])
-st.metric("Energy", avg_metrics["energy"])
-st.metric("Valence (Happiness)", avg_metrics["valence"])
+# --- Mood Metrics (from Spotify data) ---
+st.subheader("🎧 Mood Metrics for Tracks")
+# Fetch audio features for the top track for demonstration
+top_track = city_data['Track'].iloc[0]
+track_uri = sp.search(q=top_track, type='track', limit=1)['tracks']['items'][0]['uri']
+audio_features = sp.audio_features([track_uri])[0]
 
-# --- Map of All Cities ---
+# Extract danceability, energy, and valence from the audio features
+danceability = audio_features['danceability']
+energy = audio_features['energy']
+valence = audio_features['valence']
+
+st.metric("Danceability", round(danceability, 2))
+st.metric("Energy", round(energy, 2))
+st.metric("Valence (Happiness)", round(valence, 2))
+
+# --- Map of UK (Example using static cities) ---
 st.subheader("🗺️ Map of UK Listening Trends")
-map_df = data.groupby("city").agg({
-    "lat": "first",
-    "lon": "first",
-    "streams": "sum"
-}).reset_index()
-
+# Example: Mapping top cities with fictional data (latitude/longitude)
 uk_map = folium.Map(location=[54.5, -3], zoom_start=5)
-for _, row in map_df.iterrows():
-    popup = f"{row['city']}<br>Total Streams: {row['streams']}"
+city_coords = {
+    'London': [51.5074, -0.1278],
+    'Manchester': [53.4808, -2.2426],
+    'Liverpool': [53.4084, -2.9916],
+    'Birmingham': [52.4862, -1.8904]
+}
+
+for city, coords in city_coords.items():
     folium.CircleMarker(
-        location=(row['lat'], row['lon']),
+        location=coords,
         radius=7,
-        popup=popup,
+        popup=city,
         color="blue",
         fill=True,
         fill_color="blue",
@@ -59,4 +104,4 @@ for _, row in map_df.iterrows():
 
 folium_static(uk_map)
 
-st.markdown("Data is representative and aggregated. Mood metrics are based on Spotify audio features per city.")
+st.markdown("Data is representative and aggregated. Real-time music data is fetched directly from Spotify.")
