@@ -24,7 +24,7 @@ st.markdown("Explore how music tastes vary across UK cities using Spotify data: 
 def get_spotify_data():
     # Example: Fetching the top 10 tracks in the UK based on popularity or streams
     # Here, I'm getting tracks from a top chart playlist (e.g., 'Top 50 - United Kingdom')
-    playlist_id = '37i9dQZEVXbLp5XoPON0wI'  # Spotify Playlist ID for 'Top 50 - United Kingdom'
+    playlist_id = '37i9dQZEVXbLnolsZ8PSNw'  # Spotify Playlist ID for 'Top 50 - United Kingdom'
     results = sp.playlist_tracks(playlist_id)
     
     # Extracting track names, artists, and streams (popularity)
